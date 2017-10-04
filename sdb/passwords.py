@@ -16,6 +16,7 @@ import sdb.subprocess_compat as subprocess
 from sdb.util import force_bytes
 from sdb.clipboard import set_clipboard_once, ClipboardException
 from sdb.diceware import WORDS
+from sdb.diceware import SELECIONADAS
 from sdb import gpg_agent
 
 
@@ -34,39 +35,16 @@ def decode(str):
     return records
 
 
-CASE_ALPHABET = string.ascii_letters
-ALPHANUMERIC = CASE_ALPHABET + string.digits
-EVERYTHING = ALPHANUMERIC + string.punctuation
+def gen_password(choices, length):
+    return ' '.join(random.choice(choices) for i in range(length))
 
 
-def gen_password(choices=ALPHANUMERIC, length=10):
-    return ''.join(random.choice(choices) for i in range(length))
-
-
-def requirements_satisfied(requirements, str):
-    return all([i in str for i in requirements])
-
-
-def gen_password_require(requirements, choices=ALPHANUMERIC, length=10):
-    """
-    Generate a password containing all the characters in requirements
-    """
-    if len(requirements) > length or not requirements_satisfied(requirements, choices):
-        raise Exception(
-            "That's impossible, you can't make a password containing %r with only %r!" % (
-                requirements, choices))
-    while True:
-        pw = gen_password(choices, length)
-        if requirements_satisfied(requirements, pw):
-            return pw
-
-
-def gen_password_entropy(entropy, choices=ALPHANUMERIC):
+def gen_password_entropy(entropy, choices=SELECIONADAS):
     """
     Generates a password of the desired entropy, calculating the length as
     required.
     """
-    required_length = int(math.ceil(entropy / math.log(len(choices), 2)))
+    required_length = int(math.floor(entropy / math.log(len(choices), 2)))
     return gen_password(choices=choices, length=required_length)
 
 
@@ -321,7 +299,7 @@ class InteractiveSession(object):
             'Password [blank to generate]: ',
             required=False,
             password=True
-        ) or gen_password_entropy(128)
+        ) or gen_password_entropy(64)
         notes = self.prompt('Notes: ', required=False)
 
         return (domain, username, password, notes)
@@ -332,7 +310,7 @@ class InteractiveSession(object):
         new_record[1] = self.prompt('Username [%s]: ' % record[1], required=False) or record[1]
         pw = self.prompt('Password []/g: ', required=False, password=True) or record[2]
         if pw == 'g':
-            new_record[2] = gen_password_entropy(128)
+            new_record[2] = gen_password_entropy(64)
         elif pw:
             new_record[2] = pw
         self.output.write("Notes: %s\n" % record[3])
@@ -433,3 +411,4 @@ class InteractiveSession(object):
         except AttributeError:
             output = self.output
         output.write(encode(self.read_records()))
+
